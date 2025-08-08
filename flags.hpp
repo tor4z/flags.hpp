@@ -306,7 +306,7 @@ std::vector<T> Flags::args()
 
 
 // ============= IMPLEMENTATION ============
-#define FLAGS_IMPLEMENTATION
+#define FLAGS_IMPLEMENTATION // delete me
 
 
 #ifdef FLAGS_IMPLEMENTATION
