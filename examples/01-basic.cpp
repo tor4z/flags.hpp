@@ -8,14 +8,13 @@ int main(int argc, char** argv)
 {
     Flags::parse(argc, argv)
         ->with_arg("test", 't', 100, "int test value")
-        ->with_arg("args", 'a', std::vector<int>(), "some arg list")
+        ->with_arg("args", 'a', std::vector<int>{1, 3, 4}, "some arg list")
         ->with_opt("option", 'o', "option test")
-        ->with_help("basic example")
-        ->build();
+        ->set_help("basic example");
 
-    std::cout << Flags::arg<int>("test") << "\n";
-    std::cout << Flags::args<std::string>().empty() << "\n";
-    std::cout << Flags::opt("option") << "\n";
+    std::cout << "test: " << Flags::arg<int>("test") << "\n";
+    std::cout << "option: " << Flags::opt("option") << "\n";
+    std::cout << "extra args empty: " << Flags::args<std::string>().empty() << "\n";
 
     std::cout << "args: ";
     auto args{Flags::arg<std::vector<int>>("args")};
