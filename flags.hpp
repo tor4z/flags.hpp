@@ -1,20 +1,13 @@
 #ifndef FLAGS_HPP_
 #define FLAGS_HPP_
 
+#include <unordered_map>
 #include <cassert>
-#include <cerrno>
-#include <cmath>
-#include <cstddef>
-#include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <mutex>
 #include <sstream>
-#include <type_traits>
-#include <unordered_map>
 #include <string>
-#include <utility>
 #include <vector>
 #include <any>
 
@@ -38,10 +31,10 @@
     } while (0)
 
 template<typename>
-struct is_vector : std::false_type {};
+struct flags_is_vector : std::false_type {};
 
 template<typename T, typename A>
-struct is_vector<std::vector<T, A>> : std::true_type {};
+struct flags_is_vector<std::vector<T, A>> : std::true_type {};
 
 template<typename T>
 T flags_cast_string(const std::string& v)
@@ -91,9 +84,9 @@ inline unsigned long long flags_cast_string<unsigned long long>(const std::strin
     return std::stoull(v);
 }
 
-bool is_short_option(char* arg);
-bool is_long_option(char* arg);
-bool is_option(char* arg);
+bool flags_is_short_option(char* arg);
+bool flags_is_long_option(char* arg);
+bool flags_is_option(char* arg);
 
 struct Flags
 {
@@ -106,10 +99,10 @@ struct Flags
 
     static Flags* parse(int argc, char** argv);
     template<typename T>
-    typename std::enable_if<!is_vector<T>::value, T>::type
+    typename std::enable_if<!flags_is_vector<T>::value, T>::type
     static arg(const std::string& key);
     template<typename T>
-    typename std::enable_if<is_vector<T>::value, T>::type
+    typename std::enable_if<flags_is_vector<T>::value, T>::type
     static arg(const std::string& key);
     template<typename T>
     static std::vector<T> args();
@@ -210,7 +203,7 @@ Flags* Flags::with_arg(const std::string& name, char shortcut, const std::vector
 }
 
 template<typename T>
-typename std::enable_if<!is_vector<T>::value, T>::type
+typename std::enable_if<!flags_is_vector<T>::value, T>::type
 Flags::arg(const std::string& key)
 {
     auto ins{instance()};
@@ -223,7 +216,7 @@ Flags::arg(const std::string& key)
 }
 
 template<typename T>
-typename std::enable_if<is_vector<T>::value, T>::type
+typename std::enable_if<flags_is_vector<T>::value, T>::type
 Flags::arg(const std::string& key)
 {
     auto ins{instance()};
@@ -259,7 +252,7 @@ bool Flags::ArgParser::expect_param(T& value)
         return false;
     }
 
-    if (is_option(argv[next])) {
+    if (flags_is_option(argv[next])) {
         token_index = next;
         return false;
     }
@@ -282,7 +275,7 @@ bool Flags::ArgParser::expect_params(std::vector<T>& value)
     }
 
     value.clear();
-    while (next < argc && !is_option(argv[next])) {
+    while (next < argc && !flags_is_option(argv[next])) {
         value.push_back(flags_cast_string<T>(argv[next]));
         ++next;
     }
@@ -295,8 +288,6 @@ bool Flags::ArgParser::expect_params(std::vector<T>& value)
 
 
 // ============= IMPLEMENTATION ============
-#define FLAGS_IMPLEMENTATION // delete me
-
 
 #ifdef FLAGS_IMPLEMENTATION
 
@@ -323,13 +314,13 @@ void Flags::set_help(const std::string& desc)
     }
 }
 
-bool is_option(char* arg)
+bool flags_is_option(char* arg)
 {
     if (arg && arg[0] == '-') return true;
     return false;
 }
 
-bool is_short_option(char* arg)
+bool flags_is_short_option(char* arg)
 {
     if (arg && strlen(arg) >= 2) {
         if (arg[0] != '-') {
@@ -343,7 +334,7 @@ bool is_short_option(char* arg)
     return false;
 }
 
-bool is_long_option(char* arg)
+bool flags_is_long_option(char* arg)
 {
     if (arg && strlen(arg) >= 3) {
         if (arg[0] == '-' && arg[1] == '-') {
@@ -423,7 +414,7 @@ Flags::ArgParser::ArgParser(int argc, char** argv)
 bool Flags::ArgParser::find_option_long_name(const std::string& name)
 {
     for (int i = 1; i < argc; ++i) {
-        if (is_long_option(argv[i])) {
+        if (flags_is_long_option(argv[i])) {
             if (strcmp((argv[i] + 2), name.c_str()) == 0) {
                 token_index = i;
                 return true;
@@ -437,7 +428,7 @@ bool Flags::ArgParser::find_option_short_name(char shortcut)
 {
 
     for (int i = 1; i < argc; ++i) {
-        if (is_short_option(argv[i])) {
+        if (flags_is_short_option(argv[i])) {
             auto this_arg{argv[i]};
             auto opt_len{strlen(this_arg)};
             for (int j = 1; j < opt_len; ++j) {
@@ -459,7 +450,7 @@ void Flags::ArgParser::gather_extra(std::vector<std::string>& extra_args)
         return;
     }
 
-    while (next < argc && !is_option(argv[next])) {
+    while (next < argc && !flags_is_option(argv[next])) {
         extra_args.push_back(argv[next]);
         ++next;
     }
