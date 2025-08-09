@@ -91,6 +91,10 @@ inline unsigned long long flags_cast_string<unsigned long long>(const std::strin
     return std::stoull(v);
 }
 
+bool is_short_option(char* arg);
+bool is_long_option(char* arg);
+bool is_option(char* arg);
+
 struct Flags
 {
     template<typename T>
@@ -119,18 +123,35 @@ private:
         char shor_name;
     }; // struct Arg
 
+    struct ArgParser
+    {
+        ArgParser(int argc, char** argv);
+        bool find_option_long_name(const std::string& name);
+        bool find_option_short_name(char shortcut);
+        void gather_extra(std::vector<std::string>& extra_args);
+        template<typename T>
+        bool expect_param(T& value);
+        template<typename T>
+        bool expect_params(std::vector<T>& value);
+
+        char** argv;
+        int argc;
+        int shortcut_index;
+        int token_index;
+    }; // struct ArgParser
+
     std::unordered_map<std::string, std::any> data_;
     std::vector<std::string> args_;
     std::string app_name_;
     std::stringstream help_doc_ss_;
     std::vector<std::string> input_args_;
     bool exit_with_help_;
+    int argc_;
+    char** argv_;
 
     static Flags* instance();
     Flags() : exit_with_help_(false) {}
     void show_help(const std::string& desc);
-    bool is_short_option(const std::string& arg);
-    bool is_long_option(const std::string& arg);
 }; // struct Flags
 
 template<typename T>
@@ -145,46 +166,13 @@ Flags* Flags::with_arg(const std::string& name, char shortcut, T value, const st
     arg.value = value;
     arg.has_extra_arg = true;
 
-    bool expect_param{false};
-    for (const auto& it : input_args_) {
-        if (is_long_option(it)) {
-            if (expect_param) {
-                exit_with_help_ = true;
-                return this;
-            }
-
-            if (name == it.substr(2)) {
-                expect_param = true;
-            }
-        } else if (is_short_option(it)) {
-            if (expect_param) {
-                exit_with_help_ = true;
-                return this;
-            }
-
-            for (char c: it) {
-                if (expect_param) {
-                    exit_with_help_ = true;
-                    return this;
-                }
-
-                if (c == shortcut) {
-                    expect_param = true;
-                }
-            }
-        } else {
-            if (expect_param) {
-                arg.value = flags_cast_string<T>(it);
-                expect_param = false;
-                break;
-            }
+    ArgParser ap(argc_, argv_);
+    if (ap.find_option_long_name(name) || ap.find_option_short_name(shortcut)) {
+        if (!ap.expect_param(arg.value)) {
+            exit_with_help_ = true;
         }
     }
-
-    if (expect_param) {
-        exit_with_help_ = true;
-        return this;
-    }
+    ap.gather_extra(args_);
 
     data_.insert(std::make_pair(name, arg));
     return this;
@@ -205,61 +193,17 @@ Flags* Flags::with_arg(const std::string& name, char shortcut, const std::vector
     Arg<std::vector<T>> arg;
     arg.long_name = name;
     arg.shor_name = shortcut;
+    arg.value = value;
     arg.has_extra_arg = true;
 
-    bool use_default{true};
-    bool expect_param{false};
-    for (const auto& it : input_args_) {
-        if (is_long_option(it)) {
-            if (expect_param) {
-                if (arg.value.empty()) {
-                    exit_with_help_ = true;
-                    return this;
-                }
-                break;
-            }
-
-            if (name == it.substr(2)) {
-                expect_param = true;
-            }
-        } else if (is_short_option(it)) {
-            if (expect_param) {
-                if (arg.value.empty()) {
-                    exit_with_help_ = true;
-                    return this;
-                }
-                break;
-            }
-
-            for (char c: it) {
-                if (expect_param) {
-                    if (arg.value.empty()) {
-                        exit_with_help_ = true;
-                        return this;
-                    }
-                    break;
-                }
-
-                if (c == shortcut) {
-                    expect_param = true;
-                }
-            }
-        } else {
-            if (expect_param) {
-                arg.value.push_back(flags_cast_string<T>(it));
-                use_default = false;
-            }
+    ArgParser ap(argc_, argv_);
+    if (ap.find_option_long_name(name) || ap.find_option_short_name(shortcut)) {
+        arg.value.clear();
+        if (!ap.expect_params<T>(arg.value)) {
+            exit_with_help_ = true;
         }
     }
-
-    if (expect_param && arg.value.empty()) {
-        exit_with_help_ = true;
-        return this;
-    }
-
-    if (use_default) {
-        arg.value = value;
-    }
+    ap.gather_extra(args_);
 
     data_.insert(std::make_pair(name, arg));
     return this;
@@ -302,6 +246,51 @@ std::vector<T> Flags::args()
     return result;
 }
 
+template<typename T>
+bool Flags::ArgParser::expect_param(T& value)
+{
+    int next{token_index + 1};
+    if (next >= argc) {
+        token_index = next;
+        return false;
+    }
+
+    if (shortcut_index > 0 && (shortcut_index + 1) != strlen(argv[token_index])) {
+        return false;
+    }
+
+    if (is_option(argv[next])) {
+        token_index = next;
+        return false;
+    }
+
+    token_index = next;
+    value = flags_cast_string<T>(argv[next]);
+    return true;
+}
+
+template<typename T>
+bool Flags::ArgParser::expect_params(std::vector<T>& value)
+{
+    int next{token_index + 1};
+    if (next >= argc) {
+        return false;
+    }
+
+    if (shortcut_index > 0 && (shortcut_index + 1) != strlen(argv[token_index])) {
+        return false;
+    }
+
+    value.clear();
+    while (next < argc && !is_option(argv[next])) {
+        value.push_back(flags_cast_string<T>(argv[next]));
+        ++next;
+    }
+
+    token_index = next - 1;
+    return !value.empty();
+}
+
 #endif // FLAGS_HPP_
 
 
@@ -311,12 +300,11 @@ std::vector<T> Flags::args()
 
 #ifdef FLAGS_IMPLEMENTATION
 
-
 void Flags::show_help(const std::string& desc)
 {
     std::cout << app_name_ << ": "
-    << desc << "\nOptions:"
-    << help_doc_ss_.str() << "\n\n";
+        << desc << "\nOptions:"
+        << help_doc_ss_.str() << "\n\n";
     exit(0);
 }
 
@@ -325,20 +313,9 @@ void Flags::set_help(const std::string& desc)
     const std::string name{"help"};
     const char shortcut{'h'};
 
-    for (const auto& it : input_args_) {
-        if (is_long_option(it)) {
-            if (name == it.substr(2)) {
-                exit_with_help_ = true;
-                break;
-            }
-        } else if (is_short_option(it)) {
-            for (char c: it) {
-                if (c == shortcut) {
-                    exit_with_help_ = true;
-                    break;
-                }
-            }
-        }
+    ArgParser ap(argc_, argv_);
+    if (ap.find_option_long_name(name) || ap.find_option_short_name(shortcut)) {
+        exit_with_help_ = true;
     }
 
     if (exit_with_help_) {
@@ -346,9 +323,15 @@ void Flags::set_help(const std::string& desc)
     }
 }
 
-bool Flags::is_short_option(const std::string& arg)
+bool is_option(char* arg)
 {
-    if (arg.size() >= 2) {
+    if (arg && arg[0] == '-') return true;
+    return false;
+}
+
+bool is_short_option(char* arg)
+{
+    if (arg && strlen(arg) >= 2) {
         if (arg[0] != '-') {
             return false;
         }
@@ -360,9 +343,9 @@ bool Flags::is_short_option(const std::string& arg)
     return false;
 }
 
-bool Flags::is_long_option(const std::string& arg)
+bool is_long_option(char* arg)
 {
-    if (arg.size() >= 3) {
+    if (arg && strlen(arg) >= 3) {
         if (arg[0] == '-' && arg[1] == '-') {
             if (arg[2] == '-') {
                 return false;
@@ -388,6 +371,8 @@ Flags* Flags::instance()
 Flags* Flags::parse(int argc, char** argv)
 {
     auto ins{instance()};
+    ins->argc_ = argc;
+    ins->argv_ = argv;
     ins->app_name_ = argv[0];
     for (int i = 1; i < argc; ++i) {
         ins->input_args_.push_back(argv[i]);
@@ -406,21 +391,11 @@ Flags* Flags::with_opt(const std::string& name, char shortcut, const std::string
     arg.has_extra_arg = false;
     arg.value = false;
 
-    for (const auto& it: input_args_) {
-        if (is_long_option(it)) {
-            if (name == it.substr(2)) {
-                arg.value = true;
-                break;
-            }
-        } else if (is_short_option(it)) {
-            for (char c: it) {
-                if (c == shortcut) {
-                    arg.value = true;
-                    break;
-                }
-            }
-        }
+    ArgParser ap(argc_, argv_);
+    if (ap.find_option_long_name(name) || ap.find_option_short_name(shortcut)) {
+        arg.value = true;
     }
+    ap.gather_extra(args_);
 
     data_.insert(std::make_pair(name, arg));
 
@@ -436,6 +411,58 @@ bool Flags::opt(const std::string& key)
     }
 
     return std::any_cast<Arg<bool>>(find_result->second).value;
+}
+
+Flags::ArgParser::ArgParser(int argc, char** argv)
+    : argv(argv)
+    , argc(argc)
+    , shortcut_index(-1)
+    , token_index(0)
+{}
+
+bool Flags::ArgParser::find_option_long_name(const std::string& name)
+{
+    for (int i = 1; i < argc; ++i) {
+        if (is_long_option(argv[i])) {
+            if (strcmp((argv[i] + 2), name.c_str()) == 0) {
+                token_index = i;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool Flags::ArgParser::find_option_short_name(char shortcut)
+{
+
+    for (int i = 1; i < argc; ++i) {
+        if (is_short_option(argv[i])) {
+            auto this_arg{argv[i]};
+            auto opt_len{strlen(this_arg)};
+            for (int j = 1; j < opt_len; ++j) {
+                if (this_arg[j] == shortcut) {
+                    token_index = i;
+                    shortcut_index = j;
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+void Flags::ArgParser::gather_extra(std::vector<std::string>& extra_args)
+{
+    int next{token_index + 1};
+    if (next >= argc) {
+        return;
+    }
+
+    while (next < argc && !is_option(argv[next])) {
+        extra_args.push_back(argv[next]);
+        ++next;
+    }
 }
 
 #endif // FLAGS_IMPLEMENTATION
