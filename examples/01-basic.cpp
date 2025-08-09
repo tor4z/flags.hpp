@@ -14,7 +14,6 @@ int main(int argc, char** argv)
 
     std::cout << "test: " << Flags::arg<int>("test") << "\n";
     std::cout << "option: " << Flags::opt("option") << "\n";
-    std::cout << "extra args empty: " << Flags::args<std::string>().empty() << "\n";
 
     std::cout << "args: ";
     auto args{Flags::arg<std::vector<int>>("args")};
@@ -22,5 +21,12 @@ int main(int argc, char** argv)
         std::cout << it << " ";
     }
     std::cout << "\n";
+
+    std::cout << "Parameters: ";
+    for (const auto& it : Flags::raw_params()) {
+        std::cout << it << " ";
+    }
+    std::cout << "\n";
+
     return 0;
 }

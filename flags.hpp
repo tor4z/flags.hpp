@@ -104,7 +104,8 @@ struct Flags
     typename std::enable_if<flags_is_vector<T>::value, T>::type
     static arg(const std::string& key);
     template<typename T>
-    static std::vector<T> args();
+    static std::vector<T> params();
+    static const std::vector<std::string>& raw_params();
     static bool opt(const std::string& key);
 private:
     template<typename T>
@@ -228,7 +229,7 @@ Flags::arg(const std::string& key)
 }
 
 template<typename T>
-std::vector<T> Flags::args()
+std::vector<T> Flags::params()
 {
     auto ins{instance()};
     std::vector<T> result;
@@ -287,6 +288,8 @@ bool Flags::ArgParser::expect_params(std::vector<T>& value)
 
 
 // ============= IMPLEMENTATION ============
+
+#define FLAGS_IMPLEMENTATION
 
 #ifdef FLAGS_IMPLEMENTATION
 
@@ -369,6 +372,9 @@ Flags* Flags::parse(int argc, char** argv)
     for (int i = 1; i < argc; ++i) {
         ins->input_args_.push_back(argv[i]);
     }
+
+    ArgParser ap(argc, argv);
+    ap.gather_extra(ins->args_);
     return ins;
 }
 
@@ -403,6 +409,12 @@ bool Flags::opt(const std::string& key)
     }
 
     return std::any_cast<Arg<bool>>(find_result->second).value;
+}
+
+const std::vector<std::string>& Flags::raw_params()
+{
+    auto ins{instance()};
+    return ins->args_;
 }
 
 Flags::ArgParser::ArgParser(int argc, char** argv)
