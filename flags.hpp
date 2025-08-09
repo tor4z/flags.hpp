@@ -5,7 +5,6 @@
 #include <cassert>
 #include <cstring>
 #include <iostream>
-#include <mutex>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -290,6 +289,8 @@ bool Flags::ArgParser::expect_params(std::vector<T>& value)
 // ============= IMPLEMENTATION ============
 
 #ifdef FLAGS_IMPLEMENTATION
+
+#include <mutex>
 
 void Flags::show_help(const std::string& desc)
 {
