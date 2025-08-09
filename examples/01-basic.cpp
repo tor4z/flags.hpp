@@ -1,6 +1,6 @@
-#include <vector>
 #define FLAGS_IMPLEMENTATION
 #include "flags.hpp"
+#include <vector>
 #include <iostream>
 
 

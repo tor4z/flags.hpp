@@ -289,7 +289,7 @@ bool Flags::ArgParser::expect_params(std::vector<T>& value)
 
 // ============= IMPLEMENTATION ============
 
-#define FLAGS_IMPLEMENTATION
+// #define FLAGS_IMPLEMENTATION
 
 #ifdef FLAGS_IMPLEMENTATION
 
