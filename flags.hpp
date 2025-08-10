@@ -83,6 +83,12 @@ inline unsigned long long flags_cast_string<unsigned long long>(const std::strin
     return std::stoull(v);
 }
 
+template<>
+inline std::string flags_cast_string<std::string>(const std::string& v)
+{
+    return v;
+}
+
 bool flags_is_short_option(char* arg);
 bool flags_is_long_option(char* arg);
 bool flags_is_option(char* arg);
