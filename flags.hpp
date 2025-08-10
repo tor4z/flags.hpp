@@ -167,7 +167,7 @@ Flags* Flags::with_arg(const std::string& name, char shortcut, T value, const st
 
     ArgParser ap(argc_, argv_);
     if (ap.find_option_long_name(name) || ap.find_option_short_name(shortcut)) {
-        if (!ap.expect_param(arg.value)) {
+        if (!ap.expect_param<T>(arg.value)) {
             exit_with_help_ = true;
         }
     }
